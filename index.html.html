@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rezervační systém DOD (ZŠ)</title>
+    <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:18px;background:#f7f9fc;color:#111}
+        h1,h2{margin:.2em 0}
+        label{display:block;margin-top:8px}
+        input,select,textarea,button{font:inherit;padding:8px;margin-top:6px;border:1px solid #cbd5e1;border-radius:6px}
+        .grid{display:grid;grid-template-columns:1fr 380px;gap:18px}
+        .card{background:white;padding:12px;border-radius:8px;box-shadow:0 1px 3px rgba(2,6,23,.08)}
+        table{width:100%;border-collapse:collapse;margin-top:10px}
+        th,td{padding:6px;border-bottom:1px solid #eee;text-align:left}
+        .ok{color:green}
+        .bad{color:#b00}
+        .small{font-size:0.9em;color:#555}
+        .muted{color:#666;font-size:0.9em}
+        .actions{display:flex;gap:8px;margin-top:8px}
+        button.primary{background:#0366d6;color:white;border:none}
+        button.danger{background:#d9534f;color:white;border:none}
+        pre{background:#0f1724;color:#dbeafe;padding:10px;border-radius:6px;overflow:auto}
+        .docs{white-space:pre-wrap;font-family:system-ui,monospace}
+    </style>
+</head>
+<body>
+    <h1>Rezervační systém - Den otevřených dveří (ZŠ)</h1>
+    <p class="muted">Jednoduchá lokální aplikace (Chrome). Data jsou uložena v localStorage pro daný prohlížeč. Administrátor přidává termíny, učitelky se na ně přihlašují. Každý termín lze obsadit pouze jednou.</p>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Přidat / importovat termíny (admin)</h2>
+            <div class="small">Každý termín obsahuje: datum (YYYY-MM-DD), start (HH:MM), místo (Meziboří|Most). Délka je přednastavená podle místa (Meziboří = 90 min, Most = 60 min).</div>
+
+            <label>Ručně přidat termín</label>
+            <input id="termDate" type="date"/>
+            <input id="termTime" type="time" style="margin-left:8px"/>
+            <select id="termPlace">
+                <option value="Meziboří">Meziboří (90 min)</option>
+                <option value="Most">Most (60 min)</option>
+            </select>
+            <div class="actions">
+                <button id="addTerm" class="primary">Přidat termín</button>
+                <button id="clearAll" class="danger">Smazat vše (admin)</button>
+            </div>
+
+            <label style="margin-top:12px">Import (CSV jedna řádka = date,start,place)</label>
+            <textarea id="csv" rows="4" placeholder="2025-10-12,09:00,Meziboří&#10;2025-10-13,10:00,Most"></textarea>
+            <div class="actions">
+                <button id="importCsv">Načíst CSV</button>
+            </div>
+
+            <h3 style="margin-top:14px">Seznam termínů</h3>
+            <table id="termsTable"><thead><tr><th>Termín</th><th>Místo</th><th>Doba</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="card">
+            <h2>Přihlášení učitelky</h2>
+            <label>Jméno</label>
+            <input id="teacherName" placeholder="Jméno a příjmení"/>
+            <label>Škola / Třída (volitelné)</label>
+            <input id="teacherSchool" placeholder="ZŠ ... / třída ..."/>
+            <label>Email (pro potvrzení / zrušení)</label>
+            <input id="teacherEmail" placeholder="email@priklad.cz"/>
+            <label>Vyberte volný termín</label>
+            <select id="availTerms"><option value="">-- žádný volný termín --</option></select>
+            <div class="small">Délka prohlídky se dopočítá podle místa.</div>
+            <div class="actions">
+                <button id="book" class="primary">Rezervovat</button>
+            </div>
+
+            <h3 style="margin-top:12px">Potvrzení / zrušení rezervace</h3>
+            <div class="small">Po rezervaci systém vygeneruje kód pro zrušení. Kód si uložte.</div>
+            <label>Kód pro zrušení</label>
+            <input id="cancelCode" placeholder="vložit kód pro zrušení"/>
+            <div class="actions">
+                <button id="cancelBtn">Zrušit rezervaci</button>
+            </div>
+
+            <h3 style="margin-top:12px">Aktuální rezervace</h3>
+            <table id="bookingsTable"><thead><tr><th>Termín</th><th>Učitelka</th><th>Škola</th><th>Email</th><th>Kód</th></tr></thead><tbody></tbody></table>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+        <h2>Dokumentace (stručně)</h2>
+        <div class="docs">
+1) Účel
+     - Systém umožňuje adminovi (škola) vytvářet termíny DOD (datum, start, místo).
+     - Učitelky se mohou přihlásit na konkrétní termín; každý termín může být obsazen jen jednou.
+
+2) Délky prohlídek
+     - Meziboří = 90 minut
+     - Most = 60 minut
+     - Po rezervaci se uloží místo a start; konec lze dopočítat: konec = start + délka.
+
+3) Jak používat (Chrome)
+     - Otevřete tento HTML soubor v Chrome (File -> Open).
+     - Admin přidá termíny ručně nebo importem CSV (formát: YYYY-MM-DD,HH:MM,Meziboří|Most).
+     - Učitelka vyplní jméno, email, vybere volný termín a klikne Rezervovat.
+     - Systém vygeneruje krátký kód pro zrušení rezervace (zobrazen v tabulce). Uložit.
+     - Zrušení: vložte kód a klikněte Zrušit.
+
+4) Uložení dat
+     - Data jsou lokálně v localStorage pro tento prohlížeč a počítač.
+     - Export/backup lze provést kopírováním JSON z konzole (viz tlačítko export v UI není implementováno, lze doplnit).
+
+5) Omezení a doporučení
+     - Není to serverová aplikace: nezabezpečené, nešifrované, není sdílené mezi zařízeními.
+     - Pro produkci je doporučeno nasadit server (ověřování admina, e-mailová notifikace, zálohy).
+     - Pokud chcete, mohu přidat export CSV, ověření e-mailů nebo generování PDF potvrzení.
+        </div>
+    </div>
+
+    <script>
+        // Jednoduchá lokální aplikace, persistance v localStorage
+        const LS_TERMS = 'dod_terms_v1';
+        const LS_BOOKS = 'dod_books_v1';
+
+        function loadJSON(key, def){ try{const v = localStorage.getItem(key); return v?JSON.parse(v):def;}catch(e){return def;} }
+        function saveJSON(key,val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+        let terms = loadJSON(LS_TERMS, []); // {id, date, time, place, duration, bookedBy?}
+        let bookings = loadJSON(LS_BOOKS, []); // {code, termId, name, email, school, createdAt}
+
+        const els = {
+            termDate: document.getElementById('termDate'),
+            termTime: document.getElementById('termTime'),
+            termPlace: document.getElementById('termPlace'),
+            addTerm: document.getElementById('addTerm'),
+            csv: document.getElementById('csv'),
+            importCsv: document.getElementById('importCsv'),
+            termsTableBody: document.querySelector('#termsTable tbody'),
+            availTerms: document.getElementById('availTerms'),
+            teacherName: document.getElementById('teacherName'),
+            teacherSchool: document.getElementById('teacherSchool'),
+            teacherEmail: document.getElementById('teacherEmail'),
+            bookBtn: document.getElementById('book'),
+            bookingsTableBody: document.querySelector('#bookingsTable tbody'),
+            cancelCode: document.getElementById('cancelCode'),
+            cancelBtn: document.getElementById('cancelBtn'),
+            clearAll: document.getElementById('clearAll')
+        };
+
+        function uid(){ return Math.random().toString(36).slice(2,10); }
+
+        function durationFor(place){
+            return place === 'Meziboří' ? 90 : 60;
+        }
+
+        function formatTermRow(t){
+            return `${t.date} ${t.time}`;
+        }
+
+        function refreshUI(){
+            terms = loadJSON(LS_TERMS, terms);
+            bookings = loadJSON(LS_BOOKS, bookings);
+
+            // terms table
+            els.termsTableBody.innerHTML = '';
+            terms.slice().sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time)).forEach(t=>{
+                const tr = document.createElement('tr');
+                const status = t.booked ? `<span class="ok">obsazeno</span>` : `<span class="small muted">volný</span>`;
+                tr.innerHTML = `<td>${formatTermRow(t)}</td><td>${t.place}</td><td>${t.duration} min</td><td>${status}</td><td></td>`;
+                const tdAct = tr.querySelector('td:last-child');
+                if(!t.booked){
+                    const btn = document.createElement('button'); btn.textContent='Odstranit'; btn.className='danger';
+                    btn.onclick = ()=>{ if(confirm('Smazat tento termín?')){ terms = terms.filter(x=>x.id!==t.id); saveJSON(LS_TERMS, terms); refreshUI(); } };
+                    tdAct.appendChild(btn);
+                } else {
+                    const book = bookings.find(b=>b.termId===t.id);
+                    const btn = document.createElement('button'); btn.textContent='Zrušit rezervaci (admin)'; btn.className='danger';
+                    btn.onclick = ()=>{ if(confirm('Smazat rezervaci a uvolnit termín?')){ bookings = bookings.filter(b=>b.termId!==t.id); terms = terms.map(x=> x.id===t.id?({...x, booked:false}):x); saveJSON(LS_BOOKS, bookings); saveJSON(LS_TERMS, terms); refreshUI(); } };
+                    tdAct.appendChild(btn);
+                }
+                els.termsTableBody.appendChild(tr);
+            });
+
+            // available select
+            els.availTerms.innerHTML = '<option value="">-- vyberte termín --</option>';
+            terms.filter(t=>!t.booked).sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time)).forEach(t=>{
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = `${t.date} ${t.time} — ${t.place} (${t.duration} min)`;
+                els.availTerms.appendChild(opt);
+            });
+
+            // bookings table
+            els.bookingsTableBody.innerHTML = '';
+            bookings.slice().sort((a,b)=> a.createdAt - b.createdAt).forEach(b=>{
+                const term = terms.find(t=>t.id===b.termId) || {date:'?',time:'?',place:'?'};
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${term.date} ${term.time} • ${term.place}</td><td>${escapeHtml(b.name)}</td><td>${escapeHtml(b.school||'')}</td><td>${escapeHtml(b.email||'')}</td><td><span class="small">${b.code}</span></td>`;
+                els.bookingsTableBody.appendChild(tr);
+            });
+        }
+
+        function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        // Add term
+        els.addTerm.addEventListener('click', ()=>{
+            const date = els.termDate.value;
+            const time = els.termTime.value;
+            const place = els.termPlace.value;
+            if(!date||!time){ alert('Vyplňte datum a čas.'); return; }
+            const id = uid();
+            const dur = durationFor(place);
+            terms.push({id,date,time,place,duration:dur,booked:false});
+            saveJSON(LS_TERMS, terms); refreshUI();
+            els.termDate.value=''; els.termTime.value='';
+        });
+
+        // Import CSV
+        els.importCsv.addEventListener('click', ()=>{
+            const txt = els.csv.value.trim();
+            if(!txt){ alert('Zadejte CSV.'); return; }
+            const lines = txt.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+            let added=0;
+            for(const line of lines){
+                const parts = line.split(',').map(p=>p.trim());
+                if(parts.length<3) continue;
+                const [date,time,place] = parts;
+                if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time) ) continue;
+                const id = uid();
+                const p = (place==='Most' ? 'Most' : 'Meziboří');
+                terms.push({id,date,time,place:p,duration:durationFor(p),booked:false});
+                added++;
+            }
+            saveJSON(LS_TERMS, terms);
+            refreshUI();
+            alert('Import hotov. Přidáno ' + added + ' termínů.');
+            els.csv.value='';
+        });
+
+        // Booking
+        els.bookBtn.addEventListener('click', ()=>{
+            const name = els.teacherName.value.trim();
+            const email = els.teacherEmail.value.trim();
+            const school = els.teacherSchool.value.trim();
+            const termId = els.availTerms.value;
+            if(!name || !email || !termId){ alert('Vyplňte jméno, email a vyberte termín.'); return; }
+            const term = terms.find(t=>t.id===termId);
+            if(!term || term.booked){ alert('Vybraný termín již není dostupný. Obnovte stránku.'); refreshUI(); return; }
+            const code = uid().toUpperCase();
+            const createdAt = Date.now();
+            bookings.push({code,termId,name,email,school,createdAt});
+            terms = terms.map(t=> t.id===termId ? ({...t, booked:true}) : t);
+            saveJSON(LS_TERMS, terms); saveJSON(LS_BOOKS, bookings);
+            refreshUI();
+            alert('Rezervace přijata. Kód pro zrušení: ' + code + '\nUložte si ho pro případ zrušení.');
+            // clear form
+            els.teacherName.value=''; els.teacherEmail.value=''; els.teacherSchool.value='';
+        });
+
+        // Cancel by code
+        els.cancelBtn.addEventListener('click', ()=>{
+            const code = els.cancelCode.value.trim().toUpperCase();
+            if(!code){ alert('Vložte kód.'); return; }
+            const book = bookings.find(b=>b.code===code);
+            if(!book){ alert('Kód nenalezen.'); return; }
+            if(!confirm('Opravdu zrušit rezervaci pro ' + book.name + '?')) return;
+            bookings = bookings.filter(b=>b.code!==code);
+            terms = terms.map(t=> t.id===book.termId ? ({...t, booked:false}) : t);
+            saveJSON(LS_BOOKS, bookings); saveJSON(LS_TERMS, terms);
+            refreshUI();
+            alert('Rezervace zrušena.');
+            els.cancelCode.value='';
+        });
+
+        // Clear all (admin)
+        els.clearAll.addEventListener('click', ()=>{
+            if(!confirm('Smazat všechna data (termíny a rezervace)?')) return;
+            terms = []; bookings = [];
+            localStorage.removeItem(LS_TERMS); localStorage.removeItem(LS_BOOKS);
+            refreshUI();
+        });
+
+        // init
+        refreshUI();
+
+        // Optional: calculate end time display (not used in UI directly but left for extension)
+        function addMinutes(timeStr, minutes){
+            const [hh,mm]=timeStr.split(':').map(Number);
+            const dt = new Date(2000,0,1,hh,mm);
+            dt.setMinutes(dt.getMinutes()+minutes);
+            return dt.toTimeString().slice(0,5);
+        }
+
+        // Expose for debugging in console
+        window._DOD = {terms,bookings,saveJSON,loadJSON};
+    </script>
+</body>
+</html>
